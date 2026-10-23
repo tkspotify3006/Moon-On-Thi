@@ -1,0 +1,43 @@
+# Tự động giải nén file .zip của app và đăng lên GitHub Pages.
+# Mỗi lần tải file zip mới lên (cùng tên, ghi đè), app tự cập nhật sau 1–2 phút.
+name: Dang app tu file zip
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Giai nen app
+        run: |
+          set -e
+          if [ -f on-thi-thpt.zip ]; then ZIP=on-thi-thpt.zip; else ZIP=$(ls *.zip 2>/dev/null | head -n 1); fi
+          if [ -z "$ZIP" ]; then echo "Khong thay file .zip o thu muc goc"; exit 1; fi
+          echo "Dung file: $ZIP"
+          rm -rf _unzip _site && mkdir _unzip
+          unzip -q "$ZIP" -d _unzip
+          ROOT=$(dirname "$(find _unzip -name index.html -not -path '*/node_modules/*' | awk '{print length, $0}' | sort -n | head -n 1 | cut -d' ' -f2-)")
+          echo "Thu muc app: $ROOT"
+          mv "$ROOT" _site
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
